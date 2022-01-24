@@ -137,6 +137,7 @@ pub struct SerializedFileWriter<W: ParquetWriter> {
     row_groups: Vec<RowGroupMetaDataPtr>,
     previous_writer_closed: bool,
     is_closed: bool,
+    column_orders: Option<Vec<parquet::ColumnOrder>>
 }
 
 impl<W: ParquetWriter> SerializedFileWriter<W> {
@@ -156,6 +157,25 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
             row_groups: Vec::new(),
             previous_writer_closed: true,
             is_closed: false,
+            column_orders: None
+        })
+    }
+    pub fn with_column_orders(mut buf: W,
+        schema: TypePtr,
+        properties: WriterPropertiesPtr, 
+        column_orders: Vec<parquet::ColumnOrder>
+    )->Result<Self>{
+        Self::start_file(&mut buf)?;
+        Ok(Self {
+            buf,
+            schema: schema.clone(),
+            descr: Arc::new(SchemaDescriptor::new(schema)),
+            props: properties,
+            total_num_rows: 0,
+            row_groups: Vec::new(),
+            previous_writer_closed: true,
+            is_closed: false,
+            column_orders: Some(column_orders)
         })
     }
 
@@ -177,7 +197,7 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
     }
 
     /// Assembles and writes metadata at the end of the file.
-    fn write_metadata(&mut self) -> Result<parquet::FileMetaData> {
+    fn write_metadata(&mut self, column_orders: Option<Vec<parquet::ColumnOrder>>) -> Result<parquet::FileMetaData> {
         let file_metadata = parquet::FileMetaData {
             version: self.props.writer_version().as_num(),
             schema: types::to_thrift(self.schema.as_ref())?,
@@ -190,7 +210,7 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
                 .collect(),
             key_value_metadata: self.props.key_value_metadata().to_owned(),
             created_by: Some(self.props.created_by().to_owned()),
-            column_orders: None,
+            column_orders,
             encryption_algorithm: None,
             footer_signing_key_metadata: None,
         };
@@ -261,7 +281,7 @@ impl<W: 'static + ParquetWriter> FileWriter for SerializedFileWriter<W> {
     fn close(&mut self) -> Result<parquet::FileMetaData> {
         self.assert_closed()?;
         self.assert_previous_writer_closed()?;
-        let metadata = self.write_metadata()?;
+        let metadata = self.write_metadata(self.column_orders.clone())?;
         self.is_closed = true;
         Ok(metadata)
     }

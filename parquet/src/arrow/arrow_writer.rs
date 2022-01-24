@@ -23,11 +23,12 @@ use arrow::array as arrow_array;
 use arrow::datatypes::{DataType as ArrowDataType, IntervalUnit, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use arrow_array::Array;
+use parquet_format::TypeDefinedOrder;
 
 use super::levels::LevelInfo;
 use super::schema::{
     add_encoded_arrow_schema_to_metadata, arrow_to_parquet_schema,
-    decimal_length_from_precision,
+    decimal_length_from_precision, 
 };
 
 use crate::column::writer::ColumnWriter;
@@ -63,16 +64,19 @@ impl<W: 'static + ParquetWriter> ArrowWriter<W> {
         arrow_schema: SchemaRef,
         props: Option<WriterProperties>,
     ) -> Result<Self> {
-        let schema = arrow_to_parquet_schema(&arrow_schema)?;
+        let schema= arrow_to_parquet_schema(&arrow_schema)?;
+        let mut column_orders = Vec::with_capacity(schema.columns().len());
+        for _ in 0..schema.columns().len(){
+            column_orders.push(parquet_format::ColumnOrder::TYPEORDER(TypeDefinedOrder{}));
+        }
         // add serialized arrow schema
         let mut props = props.unwrap_or_else(|| WriterProperties::builder().build());
         add_encoded_arrow_schema_to_metadata(&arrow_schema, &mut props);
 
         let max_row_group_size = props.max_row_group_size();
 
-        let file_writer =
-            SerializedFileWriter::new(writer, schema.root_schema_ptr(), Arc::new(props))?;
-
+        let file_writer = SerializedFileWriter::with_column_orders(writer, schema.root_schema_ptr(), Arc::new(props), column_orders)?;
+        
         Ok(Self {
             writer: file_writer,
             arrow_schema,
