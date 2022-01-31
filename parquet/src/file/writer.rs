@@ -137,7 +137,7 @@ pub struct SerializedFileWriter<W: ParquetWriter> {
     row_groups: Vec<RowGroupMetaDataPtr>,
     previous_writer_closed: bool,
     is_closed: bool,
-    column_orders: Option<Vec<parquet::ColumnOrder>>
+    column_orders: Option<Vec<parquet::ColumnOrder>>,
 }
 
 impl<W: ParquetWriter> SerializedFileWriter<W> {
@@ -157,14 +157,15 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
             row_groups: Vec::new(),
             previous_writer_closed: true,
             is_closed: false,
-            column_orders: None
+            column_orders: None,
         })
     }
-    pub fn with_column_orders(mut buf: W,
+    pub fn with_column_orders(
+        mut buf: W,
         schema: TypePtr,
-        properties: WriterPropertiesPtr, 
-        column_orders: Vec<parquet::ColumnOrder>
-    )->Result<Self>{
+        properties: WriterPropertiesPtr,
+        column_orders: Vec<parquet::ColumnOrder>,
+    ) -> Result<Self> {
         Self::start_file(&mut buf)?;
         Ok(Self {
             buf,
@@ -175,7 +176,7 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
             row_groups: Vec::new(),
             previous_writer_closed: true,
             is_closed: false,
-            column_orders: Some(column_orders)
+            column_orders: Some(column_orders),
         })
     }
 
@@ -197,7 +198,10 @@ impl<W: ParquetWriter> SerializedFileWriter<W> {
     }
 
     /// Assembles and writes metadata at the end of the file.
-    fn write_metadata(&mut self, column_orders: Option<Vec<parquet::ColumnOrder>>) -> Result<parquet::FileMetaData> {
+    fn write_metadata(
+        &mut self,
+        column_orders: Option<Vec<parquet::ColumnOrder>>,
+    ) -> Result<parquet::FileMetaData> {
         let file_metadata = parquet::FileMetaData {
             version: self.props.writer_version().as_num(),
             schema: types::to_thrift(self.schema.as_ref())?,
